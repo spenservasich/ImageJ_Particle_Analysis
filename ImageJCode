@@ -1,0 +1,76 @@
+// Ctrl R to run Macro
+// prompts user to name the run, which is saved as a separate tab in the excel file
+nameEntered = getString("Enter the Run Name", "default");
+
+// closes log window
+if (isOpen("Log")) {
+selectWindow("Log");
+run("Close");
+}
+//define variables
+runNumber = 1;
+trueArray = newArray();
+allMeans = newArray();
+continueRun = true;
+
+// run for as many iterations as the single batch requires
+while(continueRun == true){
+
+//get image and make it ready to be analyzed
+run("IJ webcam plugin", "grab");
+
+//sets threshold for analysis
+setThreshold(0,125);
+
+//analyze the particles
+run("Analyze Particles...", "size=100-infinity circularity=.5-1 show=Overlay Masks display include");
+
+//save analyzed picture
+save(nameEntered + "_Picture"+ runNumber + ".jpg");
+
+// define the array
+arrayReuse = newArray(nResults);
+
+// loop
+for ( i=0; i<nResults; i++ ) {
+arrayReuse[i] = getResult("Area", i);
+}
+//means to find the standard deviation of the means
+Array.getStatistics(arrayReuse, mean);
+allMeans = Array.concat(allMeans, mean);
+
+//add the temporary array to the big array to compile the results from each iteration //keeping track of each of the particle areas (in pixels)
+trueArray = Array.concat(trueArray, arrayReuse);
+
+//keeps track of number of runs/iterations in this batch of particles
+runNumber++;
+
+// closes all open windows
+close("*");
+
+//prompts user to see if they want to continue analyzing the batch of particles & do //another run
+continueRun = getBoolean("Want to run again?");
+
+}
+//adds the area of each particle (in pixels) from the entire batch (in trueArray) to an excel //document
+run("Read and Write Excel", "file=[insert path here] sheet="+nameEntered);
+
+//finds the statistics from trueArray, which has the area of every particle analyzed
+Array.getStatistics(trueArray, min, max, mean, stdDev);
+
+//creates an array from the statistics gotten from trueArray, and converts pixels to mm^2 //(these values will differ if camera is adjusted)
+summaryArray = newArray("Particles", "Minimum:"+(min/25.529)+"mm^2","Maximum: "+(max/25.529)+"mm^2","Mean: "+(mean/25.529)+"mm^2","Standard Deviation: "+(stdDev/25.529)+"mm^2");
+
+//displays summaryArray
+Array.show("Results", summaryArray);
+
+//adds the summaryArray to the same excel file
+run("Read and Write Excel", "file=[insert path here] sheet="+nameEntered);
+
+//gets the standard deviation between the average particle area found in each of the //10x10 meshs analyzed (meaning each run) to see if the analysis is remaining consistent
+Array.getStatistics(allMeans, min, max, mean, stdDev);
+stdDevMeans = newArray("Std Dev of Means (mm^2)", (stdDev/25.529));
+Array.show("Results", stdDevMeans);
+run("Read and Write Excel", "file=[Insert File path] sheet="+nameEntered);
+//Closes everything
+close("*");
